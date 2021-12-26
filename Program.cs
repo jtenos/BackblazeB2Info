@@ -43,10 +43,17 @@ void ListFiles(string apiUrl, string accountAuthorizationToken, string bucketId)
     SortedList<string, BasicCsvRecord> fileList = new();
 
     FileCollectionResult fileCollection;
+    string? startFileName = null;
     do
     {
         HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(apiUrl + "/b2api/v2/b2_list_file_names");
-        string body = "{\"bucketId\":\"" + bucketId + "\",\"maxFileCount\":10000}";
+        object requestBody = new
+        {
+            bucketId = bucketId,
+            maxFileCount = 10000,
+            startFileName = startFileName
+        };
+        string body = JsonSerializer.Serialize(requestBody);
         var data = Encoding.UTF8.GetBytes(body);
         webRequest.Method = "POST";
         webRequest.Headers.Add("Authorization", accountAuthorizationToken);
@@ -63,9 +70,16 @@ void ListFiles(string apiUrl, string accountAuthorizationToken, string bucketId)
         fileCollection = JsonSerializer.Deserialize<FileCollectionResult>(json)!;
         foreach (var file in fileCollection.Files)
         {
-            fileList.Add(Regex.Replace(file.FileName, @"\.bzEmpty$", ""), new() { Name = Regex.Replace(file.FileName, @"\.bzEmpty$", ""), Size = file.Size });
+            string key = Regex.Replace(file.FileName, @"\.bzEmpty$", "");
+            if (fileList.ContainsKey(key)) { continue; }
+
+            Console.WriteLine(file.FileName);
+            fileList.Add(key, new() { Name = Regex.Replace(file.FileName, @"\.bzEmpty$", ""), Size = file.Size });
         }
-    } while (fileCollection.NextFileName is { Length: > 0 });
+
+        startFileName = fileCollection.NextFileName;
+        Console.WriteLine($"startFileName={startFileName}");
+    } while (startFileName is { Length: > 0 });
 
     using (StreamWriter basicWriter = new("files-basic.csv"))
     {

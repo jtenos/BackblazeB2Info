@@ -5,3 +5,4 @@ obj
 secrets.json
 
 files-basic.csv
+.DS_Store
